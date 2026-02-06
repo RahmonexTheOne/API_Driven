@@ -25,6 +25,10 @@ def lambda_handler(event, context):
         elif action == "stop":
             ec2.stop_instances(InstanceIds=[instance_id])
             msg = f"Instance {instance_id} stopping..."
+        elif action == "status":
+            response = ec2.describe_instances(InstanceIds=[instance_id])
+            state = response['Reservations'][0]['Instances'][0]['State']['Name']
+            msg = f"Instance {instance_id} is currently: {state.upper()}"    
         else:
             return {"statusCode": 400, "body": json.dumps("Invalid action")}
 
