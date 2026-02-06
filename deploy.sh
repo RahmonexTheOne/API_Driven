@@ -72,11 +72,15 @@ else
 fi
 
 FINAL_URL="${HOST_URL}/restapis/$API_ID/dev/_user_request_/manage"
+HEALTH_URL="${HOST_URL}/_localstack/health"
 
 echo "--------------------------------------------------"
 echo "ARCHITECTURE DÉPLOYÉE (Zero-Localhost Dependency)"
 echo "Instance ID : $INSTANCE_ID"
 echo "Endpoint Public : $FINAL_URL"
+echo "Health Check : $HEALTH_URL"
 echo "--------------------------------------------------"
 echo "Commande de test :"
 echo "curl -X POST -H 'Content-Type: application/json' -d '{\"action\": \"stop\", \"instance_id\": \"$INSTANCE_ID\"}' $FINAL_URL"
+echo "Santé LocalStack :"
+echo "   curl $HEALTH_URL"

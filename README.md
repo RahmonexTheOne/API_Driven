@@ -61,7 +61,14 @@ curl -X POST -H 'Content-Type: application/json' \
      https://<CODESPACE-URL>.app.github.dev/restapis/<API-ID>/dev/_user_request_/manage
 ```
 
-### 4. Nettoyage
+### 4. Vérification de l'Infrastructure (Health Check)
+Pour vérifier que le serveur LocalStack fonctionne correctement (indépendamment de notre API), une route native est exposée et affichée à la fin du déploiement :
+
+```bash
+curl https://effective-telegram-976vvq549gr6hggg-4566.app.github.dev/_localstack/health
+```
+
+### 5. Nettoyage
 Pour supprimer l'environnement virtuel et les artefacts temporaires :
 
 ```bash
