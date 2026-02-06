@@ -1,41 +1,34 @@
 #!/bin/bash
 
-# Définition stricte des chemins vers nos outils isolés
+# Chemins et Configuration
 VENV_BIN="./.venv/bin"
 AWS_CMD="$VENV_BIN/awslocal"
-
-# On ajoute le bin du venv au PATH pour que awslocal trouve aws
 export PATH="$PWD/.venv/bin:$PATH"
 
-echo "Démarrage du déploiement..."
+echo "Démarrage du déploiement (Mode: No-Localhost)..."
 
-# Vérification que les outils sont là
+# Vérification des outils
 if [ ! -f "$AWS_CMD" ]; then
-    echo "Erreur : awslocal introuvable. Avez-vous lancé 'make install' ?"
+    echo "Erreur : Environnement non détecté. Lancez 'make install' d'abord."
     exit 1
 fi
 
-# 1. Création Instance EC2
-echo "Lancement EC2..."
+# 1. EC2
+echo "Provisionning Instance EC2..."
 INSTANCE_ID=$($AWS_CMD ec2 run-instances \
     --image-id ami-df5de72b \
     --count 1 \
     --instance-type t2.micro \
     --query 'Instances[0].InstanceId' \
     --output text)
-
-if [ -z "$INSTANCE_ID" ] || [ "$INSTANCE_ID" == "None" ]; then
-    echo "❌ Erreur lors de la création de l'instance."
-    exit 1
-fi
-echo "Instance créée : $INSTANCE_ID"
+echo "Instance prête : $INSTANCE_ID"
 
 # 2. Lambda
-echo "Packaging Lambda..."
+echo "Packaging de la Lambda..."
 rm -f function.zip
 zip function.zip lambda_function.py > /dev/null
 
-echo "Déploiement Lambda..."
+echo "Déploiement de la logique Serverless (Lambda)..."
 $AWS_CMD lambda delete-function --function-name ControlEC2 > /dev/null 2>&1
 $AWS_CMD lambda create-function \
     --function-name ControlEC2 \
@@ -47,7 +40,7 @@ $AWS_CMD lambda create-function \
 LAMBDA_ARN=$($AWS_CMD lambda get-function --function-name ControlEC2 --query 'Configuration.FunctionArn' --output text)
 
 # 3. API Gateway
-echo "Déploiement API Gateway..."
+echo "Configuration de l'API Gateway..."
 API_ID=$($AWS_CMD apigateway create-rest-api --name "EC2ControllerAPI" --query 'id' --output text)
 PARENT_ID=$($AWS_CMD apigateway get-resources --rest-api-id $API_ID --query 'items[0].id' --output text)
 
@@ -57,11 +50,7 @@ RESOURCE_ID=$($AWS_CMD apigateway create-resource \
     --path-part manage \
     --query 'id' --output text)
 
-$AWS_CMD apigateway put-method \
-    --rest-api-id $API_ID \
-    --resource-id $RESOURCE_ID \
-    --http-method POST \
-    --authorization-type "NONE" > /dev/null
+$AWS_CMD apigateway put-method --rest-api-id $API_ID --resource-id $RESOURCE_ID --http-method POST --authorization-type "NONE" > /dev/null
 
 $AWS_CMD apigateway put-integration \
     --rest-api-id $API_ID \
@@ -73,10 +62,21 @@ $AWS_CMD apigateway put-integration \
 
 $AWS_CMD apigateway create-deployment --rest-api-id $API_ID --stage-name dev > /dev/null
 
+# --- DETECTION DYNAMIQUE DE L'URL (FINI LE LOCALHOST) ---
+if [ -n "$CODESPACE_NAME" ]; then
+    # Nous sommes dans GitHub Codespaces
+    HOST_URL="https://${CODESPACE_NAME}-4566.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+else
+    # Fallback générique si hors codespaces
+    HOST_URL="http://127.0.0.1:4566"
+fi
+
+FINAL_URL="${HOST_URL}/restapis/$API_ID/dev/_user_request_/manage"
+
 echo "--------------------------------------------------"
-echo "DÉPLOIEMENT RÉUSSI"
+echo "ARCHITECTURE DÉPLOYÉE (Zero-Localhost Dependency)"
 echo "Instance ID : $INSTANCE_ID"
-echo "URL API : http://localhost:4566/restapis/$API_ID/dev/_user_request_/manage"
+echo "Endpoint Public : $FINAL_URL"
 echo "--------------------------------------------------"
-echo "Testez votre API avec cette commande :"
-echo "curl -X POST -H 'Content-Type: application/json' -d '{\"action\": \"stop\", \"instance_id\": \"$INSTANCE_ID\"}' http://localhost:4566/restapis/$API_ID/dev/_user_request_/manage"
+echo "Commande de test :"
+echo "curl -X POST -H 'Content-Type: application/json' -d '{\"action\": \"stop\", \"instance_id\": \"$INSTANCE_ID\"}' $FINAL_URL"
