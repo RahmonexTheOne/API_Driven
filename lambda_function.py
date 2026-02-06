@@ -1,9 +1,14 @@
 import boto3
 import json
+import os
 
 def lambda_handler(event, context):
-    # On pointe explicitement vers LocalStack interne
-    ec2 = boto3.client('ec2', region_name='us-east-1', endpoint_url='http://localstack:4566')
+    # LocalStack nous donne son adresse interne
+    ls_host = os.environ.get("LOCALSTACK_HOSTNAME", "localhost")
+    endpoint_url = f"http://{ls_host}:4566"
+    
+    # On configure Boto3 pour utiliser cette adresse interne
+    ec2 = boto3.client('ec2', region_name='us-east-1', endpoint_url=endpoint_url)
 
     try:
         body = json.loads(event.get('body', '{}'))
